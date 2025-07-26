@@ -1,4 +1,4 @@
-package cloudflared1
+package client
 
 import (
 	"context"

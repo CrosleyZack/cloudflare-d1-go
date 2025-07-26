@@ -1,4 +1,4 @@
-package cloudflared1_test
+package client
 
 import (
 	"context"
@@ -9,7 +9,6 @@ import (
 	"testing"
 
 	cloudflared1 "github.com/crosleyzack/cloudflare-d1-go"
-	cloudflare_d1_go "github.com/crosleyzack/cloudflare-d1-go/client"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -21,13 +20,13 @@ var (
 
 func TestNewClient(t *testing.T) {
 	// missing account id
-	_, err := cloudflare_d1_go.NewClient("", apiToken)
+	_, err := NewClient("", apiToken)
 	assert.Error(t, err)
 	// missing token
-	_, err = cloudflare_d1_go.NewClient(accountID, "")
+	_, err = NewClient(accountID, "")
 	assert.Error(t, err)
 	// valid values
-	client, err := cloudflare_d1_go.NewClient(accountID, apiToken)
+	client, err := NewClient(accountID, apiToken)
 	assert.NoError(t, err)
 	assert.NotNil(t, client)
 	assert.Equal(t, client.APIToken, apiToken)
@@ -36,7 +35,7 @@ func TestNewClient(t *testing.T) {
 
 func TestCreateDeleteUpdateDB(t *testing.T) {
 	newDBName := fmt.Sprintf("test-%s", randomString(4))
-	client, err := cloudflare_d1_go.NewClient(accountID, apiToken)
+	client, err := NewClient(accountID, apiToken)
 	ctx := context.Background()
 	createResult, err := client.CreateDB(ctx, newDBName)
 	assert.NoError(t, err)
@@ -90,7 +89,7 @@ func TestCreateDeleteUpdateDB(t *testing.T) {
 func TestEditDBRecords(t *testing.T) {
 	// create db for testing
 	newDBName := fmt.Sprintf("test-%s", randomString(4))
-	client, err := cloudflare_d1_go.NewClient(accountID, apiToken)
+	client, err := NewClient(accountID, apiToken)
 	ctx := context.Background()
 	createResult, err := client.CreateDB(ctx, newDBName)
 	assert.NoError(t, err)
