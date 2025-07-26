@@ -35,7 +35,7 @@ go get github.com/crosleyzack/cloudflare-d1-go
 ### Initialize the client 🔑
 
 ```go
-client := cloudflare_d1_go.NewClient("account_id", "api_token")
+client := cloudflare-d1-go.NewClient("account_id", "api_token")
 ```
 
 ### Query the database 🔍

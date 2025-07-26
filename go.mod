@@ -1,6 +1,6 @@
-module github.com/crosleyzack/cloudflare_d1_go
+module github.com/crosleyzack/cloudflare-d1-go
 
-go 1.23.3
+go 1.23.0
 
 toolchain go1.23.11
 

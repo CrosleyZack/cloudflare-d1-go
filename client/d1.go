@@ -5,8 +5,8 @@ import (
 	"errors"
 	"fmt"
 
-	cloudflared1 "github.com/crosleyzack/cloudflare_d1_go"
-	"github.com/crosleyzack/cloudflare_d1_go/utils"
+	cloudflared1 "github.com/crosleyzack/cloudflare-d1-go"
+	"github.com/crosleyzack/cloudflare-d1-go/utils"
 )
 
 type Client struct {

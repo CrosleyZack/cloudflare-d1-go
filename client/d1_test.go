@@ -8,7 +8,7 @@ import (
 	"os"
 	"testing"
 
-	cloudflared1 "github.com/crosleyzack/cloudflare_d1_go"
+	cloudflared1 "github.com/crosleyzack/cloudflare-d1-go"
 	"github.com/stretchr/testify/assert"
 )
 

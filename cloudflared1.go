@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/crosleyzack/cloudflare_d1_go/utils"
+	"github.com/crosleyzack/cloudflare-d1-go/utils"
 	"github.com/google/uuid"
 )
 
