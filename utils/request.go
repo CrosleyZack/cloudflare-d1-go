@@ -1,23 +1,32 @@
 package utils
 
 import (
+	"bytes"
 	"encoding/json"
-	"io/ioutil"
+	"io"
 	"net/http"
-	"strings"
 )
 
-type APIResponse struct {
-	Result  interface{} `json:"result"`
-	Success bool        `json:"success"`
-	Errors  []struct {
+type APIResponse[T any] struct {
+	Result   T        `json:"result"`
+	Success  bool     `json:"success"`
+	Messages []string `json:"messages"`
+	Errors   []struct {
 		Code    int    `json:"code"`
 		Message string `json:"message"`
 	} `json:"errors"`
 }
 
-func DoRequest(method, url, payload, apiToken string) (*APIResponse, error) {
-	req, err := http.NewRequest(method, url, strings.NewReader(payload))
+func DoRequest[T any](method string, url string, payload map[string]any, apiToken string) (*APIResponse[T], error) {
+	var reqbody io.Reader
+	if payload != nil {
+		jsonString, err := json.Marshal(payload)
+		if err != nil {
+			return nil, err
+		}
+		reqbody = bytes.NewReader(jsonString)
+	}
+	req, err := http.NewRequest(method, url, reqbody)
 	if err != nil {
 		return nil, err
 	}
@@ -31,12 +40,12 @@ func DoRequest(method, url, payload, apiToken string) (*APIResponse, error) {
 	}
 	defer res.Body.Close()
 
-	body, err := ioutil.ReadAll(res.Body)
+	body, err := io.ReadAll(res.Body)
 	if err != nil {
 		return nil, err
 	}
 
-	var apiRes APIResponse
+	var apiRes APIResponse[T]
 	if err := json.Unmarshal(body, &apiRes); err != nil {
 		return nil, err
 	}

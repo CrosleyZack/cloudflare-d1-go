@@ -1,129 +1,94 @@
 package cloudflared1
 
 import (
+	"context"
+	"errors"
 	"fmt"
-	"strings"
 
-	"github.com/ashayas/cloudflare-d1-go/utils"
+	cloudflared1 "github.com/crosleyzack/cloudflare-d1-go"
+	"github.com/crosleyzack/cloudflare-d1-go/utils"
 )
 
 type Client struct {
-	AccountID  string
-	APIToken   string
-	DatabaseID string
+	AccountID string
+	APIToken  string
+	// track map of dbName->dbID to facilitate lookups by name
+	NameIDMap map[string]string
 }
 
-func NewClient(accountID, apiToken string) *Client {
+var _ cloudflared1.CloudflareD1 = (*Client)(nil)
+
+// NewClient creates a client for communicating with Cloudflare D1
+func NewClient(accountID, apiToken string) (*Client, error) {
 	if accountID == "" || apiToken == "" {
-		return nil
+		return nil, errors.New("Invalid account ID and/or API Token")
 	}
 	return &Client{
 		AccountID: accountID,
 		APIToken:  apiToken,
-	}
+		NameIDMap: map[string]string{},
+	}, nil
 }
 
-func (c *Client) ListDB() (*utils.APIResponse, error) {
+// CreateDB create a new database with the given name in the cloudflare account.
+func (c *Client) CreateDB(_ context.Context, dbName string) (*utils.APIResponse[cloudflared1.D1Database], error) {
 	url := fmt.Sprintf("https://api.cloudflare.com/client/v4/accounts/%s/d1/database", c.AccountID)
-	return utils.DoRequest("GET", url, "", c.APIToken)
-}
-
-func (c *Client) CreateDB(name string) (*utils.APIResponse, error) {
-	url := fmt.Sprintf("https://api.cloudflare.com/client/v4/accounts/%s/d1/database", c.AccountID)
-	body := fmt.Sprintf(`{"name":"%s"}`, name)
-	return utils.DoRequest("POST", url, body, c.APIToken)
-}
-
-func (c *Client) DeleteDB(databaseID string) (*utils.APIResponse, error) {
-	url := fmt.Sprintf("https://api.cloudflare.com/client/v4/accounts/%s/d1/database/%s", c.AccountID, databaseID)
-	return utils.DoRequest("DELETE", url, "", c.APIToken)
-}
-
-// Runs SQL query on the D1 database with parameters
-func (c *Client) QueryDB(databaseID string, query string, params []string) (*utils.APIResponse, error) {
-	url := fmt.Sprintf("https://api.cloudflare.com/client/v4/accounts/%s/d1/database/%s/raw", c.AccountID, databaseID)
-
-	// Create the request body with params and sql
-	body := fmt.Sprintf(`{
-		"sql": "%s",
-		"params": %s
-	}`, query, formatParams(params))
-
-	return utils.DoRequest("POST", url, body, c.APIToken)
-}
-
-// Helper function to format parameters as a JSON array
-func formatParams(params []string) string {
-	if len(params) == 0 {
-		return "[]"
+	body := map[string]any{
+		"name": dbName,
 	}
-
-	quoted := make([]string, len(params))
-	for i, p := range params {
-		quoted[i] = fmt.Sprintf(`"%s"`, p)
-	}
-	return fmt.Sprintf(`[%s]`, strings.Join(quoted, ","))
-}
-
-func (c *Client) CreateTableWithID(databaseID, createQuery string) (*utils.APIResponse, error) {
-	url := fmt.Sprintf("https://api.cloudflare.com/client/v4/accounts/%s/d1/database/%s/raw", c.AccountID, databaseID)
-	body := fmt.Sprintf(`{
-		"sql": "%s",
-		"params": []
-	}`, createQuery)
-	return utils.DoRequest("POST", url, body, c.APIToken)
-}
-
-func (c *Client) RemoveTableWithID(databaseID, tableName string) (*utils.APIResponse, error) {
-	url := fmt.Sprintf("https://api.cloudflare.com/client/v4/accounts/%s/d1/database/%s/raw", c.AccountID, databaseID)
-	query := fmt.Sprintf("DROP TABLE IF EXISTS %s;", tableName)
-	body := fmt.Sprintf(`{
-		"sql": "%s",
-		"params": []
-	}`, query)
-	return utils.DoRequest("POST", url, body, c.APIToken)
-}
-
-// ConnectDB finds and connects to a database by name, storing its ID for future operations
-func (c *Client) ConnectDB(name string) error {
-	resp, err := c.ListDB()
+	res, err := utils.DoRequest[cloudflared1.D1Database]("POST", url, body, c.APIToken)
 	if err != nil {
-		return fmt.Errorf("failed to list databases: %w", err)
+		return nil, err
 	}
-
-	// Parse response to find database with matching name
-	databases := resp.Result.([]interface{})
-	for _, db := range databases {
-		dbMap := db.(map[string]interface{})
-		if dbMap["name"].(string) == name {
-			c.DatabaseID = dbMap["uuid"].(string)
-			return nil
-		}
-	}
-
-	return fmt.Errorf("database with name %s not found", name)
+	c.NameIDMap[dbName] = res.Result.UUID.String()
+	return res, err
 }
 
-// Query runs SQL query on the connected database
-func (c *Client) Query(query string, params []string) (*utils.APIResponse, error) {
-	if c.DatabaseID == "" {
-		return nil, fmt.Errorf("no database connected, call ConnectDB first")
-	}
-	return c.QueryDB(c.DatabaseID, query, params)
+// DeleteDB delete a database by ID in the cloudflare account.
+func (c *Client) DeleteDB(_ context.Context, dbID string) (*utils.APIResponse[cloudflared1.DeleteResult], error) {
+	url := fmt.Sprintf("https://api.cloudflare.com/client/v4/accounts/%s/d1/database/%s", c.AccountID, dbID)
+	return utils.DoRequest[cloudflared1.DeleteResult]("DELETE", url, nil, c.APIToken)
 }
 
-// CreateTable creates a table in the connected database
-func (c *Client) CreateTable(createQuery string) (*utils.APIResponse, error) {
-	if c.DatabaseID == "" {
-		return nil, fmt.Errorf("no database connected, call ConnectDB first")
+// UpdateDB update the database settings by ID in the cloudflare account.
+func (c *Client) UpdateDB(_ context.Context, dbID string, settings cloudflared1.DBSettings) (*utils.APIResponse[cloudflared1.D1Database], error) {
+	url := fmt.Sprintf("https://api.cloudflare.com/client/v4/accounts/%s/d1/database/%s", c.AccountID, dbID)
+	body := map[string]any{
+		"read_replication": map[string]any{
+			"mode": settings.Replication.String(),
+		},
 	}
-	return c.CreateTableWithID(c.DatabaseID, createQuery)
+	return utils.DoRequest[cloudflared1.D1Database]("PATCH", url, body, c.APIToken)
 }
 
-// RemoveTable removes a table from the connected database
-func (c *Client) RemoveTable(tableName string) (*utils.APIResponse, error) {
-	if c.DatabaseID == "" {
-		return nil, fmt.Errorf("no database connected, call ConnectDB first")
+// GetDB retrieve information on a database by id in the cloudflare account.
+func (c *Client) GetDB(_ context.Context, dbID string) (*utils.APIResponse[cloudflared1.D1Database], error) {
+	url := fmt.Sprintf("https://api.cloudflare.com/client/v4/accounts/%s/d1/database/%s", c.AccountID, dbID)
+	return utils.DoRequest[cloudflared1.D1Database]("GET", url, nil, c.APIToken)
+}
+
+// ListDB list all databases in the cloudflare account.
+func (c *Client) ListDB(_ context.Context) (*utils.APIResponse[cloudflared1.D1DatabaseList], error) {
+	url := fmt.Sprintf("https://api.cloudflare.com/client/v4/accounts/%s/d1/database", c.AccountID)
+	return utils.DoRequest[cloudflared1.D1DatabaseList]("GET", url, nil, c.APIToken)
+}
+
+// QueryDB execute a SQL query on the D1 database with parameters
+func (c *Client) QueryDB(_ context.Context, dbID string, query string, params ...any) (*utils.APIResponse[[]cloudflared1.QueryResult[any]], error) {
+	url := fmt.Sprintf("https://api.cloudflare.com/client/v4/accounts/%s/d1/database/%s/query", c.AccountID, dbID)
+	body := map[string]any{
+		"sql":    query,
+		"params": params,
 	}
-	return c.RemoveTableWithID(c.DatabaseID, tableName)
+	return utils.DoRequest[[]cloudflared1.QueryResult[any]]("POST", url, body, c.APIToken)
+}
+
+// QueryDBRaw execute a SQL query on the D1 database with parameters
+func (c *Client) QueryDBRaw(_ context.Context, dbID string, query string, params ...any) (*utils.APIResponse[[]cloudflared1.QueryResult[any]], error) {
+	url := fmt.Sprintf("https://api.cloudflare.com/client/v4/accounts/%s/d1/database/%s/raw", c.AccountID, dbID)
+	body := map[string]any{
+		"sql":    query,
+		"params": params,
+	}
+	return utils.DoRequest[[]cloudflared1.QueryResult[any]]("POST", url, body, c.APIToken)
 }

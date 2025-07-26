@@ -1,19 +1,25 @@
 # Cloudflare D1 Go Client ☁️ 
 
 <p align="center">
-<img src="https://raw.githubusercontent.com/ashayas/cloudflare-d1-go/refs/heads/master/.github/assets/gopher.png" width="250" alt="Cloudflare D1 Go"/>
+<img src="https://raw.githubusercontent.com/crosleyzack/cloudflare-d1-go/refs/heads/master/.github/assets/gopher.png" width="250" alt="Cloudflare D1 Go"/>
 </p>
 
-<p align="center">
-<a href="https://twitter.com/ashayas/">🐦 Twitter</a>
-</p>
 
 <p align="center">
-<a href="https://pkg.go.dev/github.com/ashayas/cloudflare-d1-go"><img src="https://pkg.go.dev/badge/github.com/ashayas/cloudflare-d1-go.svg" alt="Go Reference"></a>
-<a href="https://goreportcard.com/report/github.com/ashayas/cloudflare-d1-go"><img src="https://goreportcard.com/badge/github.com/ashayas/cloudflare-d1-go" alt="Go Report Card"></a>
-<img src="https://img.shields.io/github/go-mod/go-version/ashayas/cloudflare-d1-go" alt="Go Version">
+<a href="https://pkg.go.dev/github.com/crosleyzack/cloudflare-d1-go"><img src="https://pkg.go.dev/badge/github.com/crosleyzack/cloudflare-d1-go.svg" alt="Go Reference"></a>
+<a href="https://goreportcard.com/report/github.com/crosleyzack/cloudflare-d1-go"><img src="https://goreportcard.com/badge/github.com/crosleyzack/cloudflare-d1-go" alt="Go Report Card"></a>
+<img src="https://img.shields.io/github/go-mod/go-version/crosleyzack/cloudflare-d1-go" alt="Go Version">
 <img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT License">
 </p>
+
+This is a [fork](https://github.com/ashayas/cloudflare-d1-go) of [@ashayas](https://github.com/ashayas) original library. The original library is fantastic and should be considered above this one depending on your use case. This implementation is intended to be a lower level, thin wrapper over Cloudflare's D1 REST API for programs to implement higher level packages around. Changes include:
+
+1. Use of templating for return values, allowing more fields of the response to be parsed by the library.
+2. Implementation of the remaining methods from the D1 REST API, such as GetDB and UpdateDB
+3. Removal of ConnectDB and addition of database ID to all methods. A map is added to correlate name to ID, but this simplifies working with multiple databases in my opinion.
+4. Addition of a mock which uses a local sqlite database for ease of testing.
+
+<hr>
 
 - This is a lightweight Go client for the Cloudflare D1 database
 - D1 is a cool serverless, zero-config, transactional SQL database built by [Cloudflare](https://www.cloudflare.com/) built for the edge and cost-effective
@@ -21,7 +27,7 @@
 ## Installation 📦
 
 ```bash
-go get github.com/ashayas/cloudflare-d1-go
+go get github.com/crosleyzack/cloudflare-d1-go
 ```
 
 ## Usage 💻
@@ -32,79 +38,43 @@ go get github.com/ashayas/cloudflare-d1-go
 client := cloudflare_d1_go.NewClient("account_id", "api_token")
 ```
 
-### Connect to a database 📁
-
-```go
-client.ConnectDB("database_id")
-```
-
 ### Query the database 🔍
 
 ```go
 // Execute a SQL query with optional parameters
 // query: SQL query string
 // params: Array of parameter values to bind to the query (use ? placeholders in query)
-client.Query("SELECT * FROM users WHERE age > ?", []string{"18"})
-```
-
-Example with parameters:
-```go
-// Find users in a specific city
-client.Query("SELECT * FROM users WHERE city = ?", []string{"San Francisco"})
-
-// Find products in a price range
-client.Query("SELECT * FROM products WHERE price >= ? AND price <= ?", []string{"10.00", "50.00"})
+client.QueryDB(ctx, "<database_id>", "SELECT * FROM users WHERE age > ?", []string{"18"})
 ```
 
 ### Create a table 📄
 
 ```go
-client.CreateTable("CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT, age INTEGER)")
+client.QueryDB(ctx, "<database_id>", "CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT, age INTEGER)")
 ```
 
 ### Remove a table 🗑️
 
 ```go
-client.RemoveTable("users")
-```
-
-### Method 2
-- Specify the database ID in the client. 
-- Useful if you have multiple databases and want to switch between them
-
-```go
-client := cloudflare_d1_go.NewClient("account_id", "api_token")
-client.QueryDB(databaseID, "SELECT * FROM users", nil)
+client.QueryDB(ctx, "<database_id>", "DROP TABLE users")
 ```
 
 ### List Of Methods
 
 #### Database Management
 - `NewClient(accountID, apiToken string) *Client` - Creates a new D1 client
-- `ListDB() (*APIResponse, error)` - Lists all databases in the account
-- `CreateDB(name string) (*APIResponse, error)` - Creates a new database
-- `DeleteDB(databaseID string) (*APIResponse, error)` - Deletes a database
-- `ConnectDB(name string) error` - Connects to a database by name for subsequent operations
-
-#### Table Operations
-- `CreateTable(createQuery string) (*APIResponse, error)` - Creates a table in the connected database
-- `RemoveTable(tableName string) (*APIResponse, error)` - Removes a table from the connected database
-- `CreateTableWithID(databaseID, createQuery string) (*APIResponse, error)` - Creates a table in a specific database
-- `RemoveTableWithID(databaseID, tableName string) (*APIResponse, error)` - Removes a table from a specific database
+- `CreateDB(ctx context.Context, name string) (*utils.APIResponse[D1Database], error)` - Create a new database in cloudflare
+- `DeleteDB(ctx context.Context, dbID string) (*utils.APIResponse[DeleteResult], error)` - delete a database from cloudflare.
+- `UpdateDB(ctx context.Context, dbID string, settings DBSettings) (*utils.APIResponse[D1Database], error)` - update the settings of a database in cloudflare.
+- `GetDB(ctx context.Context, dbID string) (*utils.APIResponse[D1Database], error)` - Retrieve a database from cloudflare.
+- `ListDB(ctx context.Context) (*utils.APIResponse[D1DatabaseList], error)` - list all databases in the cloudflare account.
 
 #### Query Execution
-- `Query(query string, params []string) (*APIResponse, error)` - Executes a query on the connected database
-- `QueryDB(databaseID string, query string, params []string) (*APIResponse, error)` - Executes a query on a specific database
-
-## TODO
-- Better error handling 🛡️
-- More comprehensive test coverage 🧪
-- Improvements on persistence of database connections 🔄 
-- Integration with GORM 🦕 
+- `QueryDB(ctx context.Context, dbID string, query string, params ...any) (*utils.APIResponse[[]QueryResult[any]], error)`
+- `QueryDBRaw(ctx context.Context, dbID string, query string, params ...any) (*utils.APIResponse[[]QueryResult[any]], error)`
 
 ## Testing 
 - Run `go test` to run the tests
-- You can use the `-v` flag to see more verbose test results
 
 ## Contributing 🤝
 Contributions are welcome! Please feel free to submit a Pull Request.
