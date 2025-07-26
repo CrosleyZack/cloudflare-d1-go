@@ -1,4 +1,4 @@
-module github.com/crosleyzack/cloudflare-d1-go
+module github.com/crosleyzack/cloudflare_d1_go
 
 go 1.23.3
 

@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	cloudflared1 "github.com/crosleyzack/cloudflare-d1-go"
-	"github.com/crosleyzack/cloudflare-d1-go/utils"
+	cloudflared1 "github.com/crosleyzack/cloudflare_d1_go"
+	"github.com/crosleyzack/cloudflare_d1_go/utils"
 	"github.com/google/uuid"
 	_ "modernc.org/sqlite"
 )
