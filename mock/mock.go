@@ -13,6 +13,7 @@ import (
 	cloudflared1 "github.com/crosleyzack/cloudflare-d1-go"
 	"github.com/crosleyzack/cloudflare-d1-go/utils"
 	"github.com/google/uuid"
+	"modernc.org/sqlite"
 	_ "modernc.org/sqlite"
 )
 
@@ -106,12 +107,9 @@ func (m *MockClient) UpdateDB(_ context.Context, dbID string, settings cloudflar
 	return &utils.APIResponse[cloudflared1.D1Database]{
 		Result:  cloudflared1.D1Database{},
 		Success: false,
-		Errors: []struct {
-			Code    int    `json:"code"`
-			Message string `json:"message"`
-		}{
+		Errors: []utils.D1Err{
 			{
-				Code:    1000,
+				Code:    1,
 				Message: "There is no concept of replication modes in local sqlite",
 			},
 		},
@@ -213,13 +211,11 @@ func (m *MockClient) query(_ context.Context, dbID string, query string, params 
 	}
 	rows, err := db.Query(query, params...)
 	if err != nil {
+		sqlErr := errToApiResp(err)
 		return &utils.APIResponse[[]cloudflared1.QueryResult[any]]{
 			Result:  []cloudflared1.QueryResult[any]{},
 			Success: false,
-			Errors: []struct {
-				Code    int    `json:"code"`
-				Message string `json:"message"`
-			}{{Code: 1000, Message: err.Error()}},
+			Errors:  []utils.D1Err{sqlErr},
 		}, nil
 	}
 	defer rows.Close()
@@ -291,13 +287,11 @@ func (m *MockClient) exec(_ context.Context, dbID string, query string, params .
 	}
 	result, err := db.Exec(query, params...)
 	if err != nil {
+		sqlErr := errToApiResp(err)
 		return &utils.APIResponse[[]cloudflared1.QueryResult[any]]{
 			Result:  []cloudflared1.QueryResult[any]{},
 			Success: false,
-			Errors: []struct {
-				Code    int    `json:"code"`
-				Message string `json:"message"`
-			}{{Code: 1000, Message: err.Error()}},
+			Errors:  []utils.D1Err{sqlErr},
 		}, nil
 	}
 	last, err := result.LastInsertId()
@@ -344,4 +338,17 @@ func (m *MockClient) QueryDBRaw(ctx context.Context, dbID string, query string, 
 
 func (m *MockClient) getDBPath(id string) string {
 	return filepath.Join(m.dbpath, fmt.Sprintf("%s.db", id))
+}
+
+func errToApiResp(err error) utils.D1Err {
+	code := 1000
+	msg := err.Error()
+	if sqlErr, ok := err.(*sqlite.Error); ok {
+		code = sqlErr.Code()
+		msg = sqlErr.Error()
+	}
+	return utils.D1Err{
+		Code:    code,
+		Message: msg,
+	}
 }

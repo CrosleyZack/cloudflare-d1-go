@@ -7,14 +7,16 @@ import (
 	"net/http"
 )
 
+type D1Err struct {
+	Code    int    `json:"code"`
+	Message string `json:"message"`
+}
+
 type APIResponse[T any] struct {
 	Result   T        `json:"result"`
 	Success  bool     `json:"success"`
 	Messages []string `json:"messages"`
-	Errors   []struct {
-		Code    int    `json:"code"`
-		Message string `json:"message"`
-	} `json:"errors"`
+	Errors   []D1Err  `json:"errors"`
 }
 
 func DoRequest[T any](method string, url string, payload map[string]any, apiToken string) (*APIResponse[T], error) {
